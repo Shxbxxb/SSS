@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Shic Shack Shock - Ultimate Tic Tac Toe</title>
+<style>
+  /* Retro arcade font from Google Fonts - Press Start 2P */
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+  :root {
+    --brown: #5D4037;
+    --camel: #D7B899;
+    --brown-dark: #3E2F25;
+    --camel-light: #F1E1C9;
+    --green-dark: rgb(1, 102, 1);
+    --green-light: rgb(14, 240, 14);
+
+
+  }
+
+  body {
+    margin: 0; padding: 0;
+    background: var(--camel-light);
+    font-family: 'Press Start 2P', cursive;
+    color: var(--brown-dark);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    user-select: none;
+  }
+
+  header {
+    background: var(--brown);
+    color: var(--camel-light);
+    padding: 16px;
+    text-align: center;
+    font-size: 1.4rem;
+    letter-spacing: 2px;
+  }
+
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+  }
+
+  /* Mode selection */
+  #modeSelect {
+    margin-bottom: 24px;
+    text-align: center;
+  }
+  #modeSelect button {
+    background: var(--brown);
+    color: var(--camel-light);
+    border: none;
+    font-family: inherit;
+    font-size: 1rem;
+    padding: 12px 20px;
+    margin: 0 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  #modeSelect button:hover {
+    background: var(--brown-dark);
+  }
+
+  /* Big board container */
+  #bigBoard {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-gap: 8px;
+    width: 480px;
+    max-width: 90vw;
+  }
+
+  /* Each big box */
+  .bigBox {
+    background: var(--camel);
+    border: 4px solid var(--brown);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 4px;
+    position: relative;
+  }
+  .bigBox.active {
+    box-shadow: 0 0 15px 3px var(--green-light);
+    border-color: var(--green-dark);
+  }
+  .bigBox.won-x {
+    background: #d49b9b88;
+    border-color: #a54444;
+  }
+  .bigBox.won-o {
+    background: #9bb7d488;
+    border-color: #4463a5;
+  }
+
+  /* Small cell */
+  .cell {
+    background: var(--camel-light);
+    border: 2px solid var(--brown-dark);
+    cursor: pointer;
+    font-size: 1.5rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
+    transition: background 0.2s ease;
+    aspect-ratio: 1/1;
+  }
+  .cell:hover {
+    background: var(--camel);
+  }
+  .cell.disabled {
+    cursor: not-allowed;
+    background: #f0ead7cc;
+  }
+
+  /* Mark styles */
+  .mark-x {
+    color: #a54444;
+  }
+  .mark-o {
+    color: #4463a5;
+  }
+
+  /* Endgame overlay */
+  #overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(93, 64, 55, 0.9);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    flex-direction: column;
+    color: var(--camel-light);
+    font-size: 1.6rem;
+    text-align: center;
+  }
+  #overlay.show {
+    display: flex;
+  }
+  #overlay button {
+    margin-top: 20px;
+    font-family: inherit;
+    font-size: 1rem;
+    padding: 12px 24px;
+    background: var(--camel);
+    color: var(--brown-dark);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    min-width: 120px;
+  }
+  #overlay button:hover {
+    background: var(--brown);
+    color: var(--camel-light);
+  }
+  #overlay .btn-group {
+    display: flex;
+    gap: 16px;
+    margin-top: 24px;
+  }
+
+  footer {
+    background: var(--brown);
+    color: var(--camel-light);
+    text-align: center;
+    padding: 12px 0;
+    font-size: 0.8rem;
+    letter-spacing: 1.5px;
+  }
+
+</style>
+</head>
+<body>
+<header>SHIC SHACK SHOCK</header>
+<main>
+  <div id="modeSelect">
+    <button id="btn1p">1 Player vs AI</button>
+    <button id="btn2p">2 Player Local</button>
+  </div>
+  <div id="bigBoard" style="display:none"></div>
+</main>
+
+<!-- End game overlay -->
+<div id="overlay">
+  <div id="resultMsg">You Win!</div>
+  <div class="btn-group">
+    <button id="btnRestart">Restart</button>
+    <button id="btnExit">Exit</button>
+  </div>
+</div>
+
+<footer>
+  Developed by Shabeeb Ahmad
+</footer>
+
+<script>
+(() => {
+  // Constants
+  const PLAYER_X = 'X';
+  const PLAYER_O = 'O';
+
+  // Game state
+  let mode = null; // '1p' or '2p'
+  let currentPlayer = PLAYER_X;
+  let nextBigBox = null; // index 0-8 or null for free move
+  let bigBoardState = Array(9).fill(null); // 'X', 'O', or 'D' for draw or null
+  let smallBoards = Array(9).fill(null).map(() => Array(9).fill(null)); // 9 boards of 9 cells each
+  let gameOver = false;
+
+  // Cached elements
+  const bigBoardEl = document.getElementById('bigBoard');
+  const modeSelectEl = document.getElementById('modeSelect');
+  const overlayEl = document.getElementById('overlay');
+  const resultMsgEl = document.getElementById('resultMsg');
+  const btnRestart = document.getElementById('btnRestart');
+  const btnExit = document.getElementById('btnExit');
+  const btn1p = document.getElementById('btn1p');
+  const btn2p = document.getElementById('btn2p');
+
+  // AI - medium level: random valid move for now
+  function aiMove() {
+    if(gameOver) return;
+    let targetBoard = nextBigBox;
+    // If target board won or full, AI can play anywhere free
+    if(targetBoard !== null && (bigBoardState[targetBoard] !== null || isBoardFull(targetBoard))) {
+      targetBoard = null;
+    }
+    // Collect valid moves
+    let validMoves = [];
+    if(targetBoard === null) {
+      for(let bb=0; bb<9; bb++) {
+        if(bigBoardState[bb] === null) {
+          for(let c=0; c<9; c++) {
+            if(smallBoards[bb][c] === null) {
+              validMoves.push({bb, c});
+            }
+          }
+        }
+      }
+    } else {
+      for(let c=0; c<9; c++) {
+        if(smallBoards[targetBoard][c] === null) {
+          validMoves.push({bb: targetBoard, c});
+        }
+      }
+    }
+    if(validMoves.length === 0) return;
+    // Simple AI pick random move
+    const choice = validMoves[Math.floor(Math.random() * validMoves.length)];
+    makeMove(choice.bb, choice.c);
+  }
+
+  // Utility: check if small board is full
+  function isBoardFull(bigIndex) {
+    return smallBoards[bigIndex].every(cell => cell !== null);
+  }
+
+  // Utility: check winner in 3x3 array (X/O)
+  function checkWinner(arr) {
+    const lines = [
+      [0,1,2],[3,4,5],[6,7,8], // rows
+      [0,3,6],[1,4,7],[2,5,8], // cols
+      [0,4,8],[2,4,6]          // diags
+    ];
+    for(const [a,b,c] of lines) {
+      if(arr[a] && arr[a] === arr[b] && arr[b] === arr[c]) {
+        return arr[a];
+      }
+    }
+    return null;
+  }
+
+  // Update bigBoard state after small board finished
+  function updateBigBoard(bigIndex) {
+    const winner = checkWinner(smallBoards[bigIndex]);
+    if(winner) {
+      bigBoardState[bigIndex] = winner;
+      highlightBigBoxWin(bigIndex, winner);
+    } else if (isBoardFull(bigIndex)) {
+      bigBoardState[bigIndex] = 'D'; // draw
+      highlightBigBoxDraw(bigIndex);
+    }
+  }
+
+  // Highlight big box for winner
+  function highlightBigBoxWin(bigIndex, player) {
+    const bb = bigBoardEl.children[bigIndex];
+    bb.classList.remove('active');
+    bb.classList.add(player === PLAYER_X ? 'won-x' : 'won-o');
+  }
+
+  // Highlight big box for draw
+  function highlightBigBoxDraw(bigIndex) {
+    const bb = bigBoardEl.children[bigIndex];
+    bb.classList.remove('active');
+    bb.style.opacity = '0.6';
+  }
+
+  // Check if game won on big board
+  function checkGameWinner() {
+    const winner = checkWinner(bigBoardState);
+    if(winner) {
+      gameOver = true;
+      showOverlay(winner === currentPlayer ? "You Win!" : "You Lose!");
+      return true;
+    }
+    if(bigBoardState.every(b => b !== null)) {
+      gameOver = true;
+      showOverlay("It's a Draw!");
+      return true;
+    }
+    return false;
+  }
+
+  // Show overlay with message
+  function showOverlay(msg) {
+    resultMsgEl.textContent = msg;
+    overlayEl.classList.add('show');
+  }
+
+  // Reset game state & UI
+  function resetGame() {
+    currentPlayer = PLAYER_X;
+    nextBigBox = null;
+    bigBoardState.fill(null);
+    for(let i=0; i<9; i++) {
+      smallBoards[i].fill(null);
+    }
+    gameOver = false;
+    overlayEl.classList.remove('show');
+    buildBoard();
+    highlightActiveBigBox();
+  }
+
+  // Build the whole big board UI
+  function buildBoard() {
+    bigBoardEl.innerHTML = '';
+    for(let bb=0; bb<9; bb++) {
+      const bigBox = document.createElement('div');
+      bigBox.className = 'bigBox';
+      bigBox.dataset.bb = bb;
+      for(let c=0; c<9; c++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.dataset.bb = bb;
+        cell.dataset.c = c;
+        bigBox.appendChild(cell);
+      }
+      bigBoardEl.appendChild(bigBox);
+    }
+  }
+
+  // Highlight the big box where the player must play
+  function highlightActiveBigBox() {
+    for(let i=0; i<9; i++) {
+      const bb = bigBoardEl.children[i];
+      bb.classList.remove('active');
+      // Only highlight if game not won or drawn
+      if(!gameOver && bigBoardState[i] === null && (nextBigBox === null || nextBigBox === i)) {
+        bb.classList.add('active');
+      }
+    }
+  }
+
+  // Update UI for a move
+  function updateMoveUI(bigIndex, cellIndex, player) {
+    const bb = bigBoardEl.children[bigIndex];
+    const cell = bb.children[cellIndex];
+    cell.textContent = player;
+    cell.classList.add(player === PLAYER_X ? 'mark-x' : 'mark-o');
+    cell.classList.add('disabled');
+    cell.style.cursor = 'default';
+  }
+
+  // Check if small board already won/draw
+  function isSmallBoardFinished(bigIndex) {
+    return bigBoardState[bigIndex] !== null;
+  }
+
+  // Click handler
+  function cellClicked(e) {
+    if(gameOver) return;
+    const cell = e.target;
+    if(!cell.classList.contains('cell')) return;
+
+    const bb = parseInt(cell.dataset.bb);
+    const c = parseInt(cell.dataset.c);
+
+    // If small board finished, no moves allowed there
+    if(isSmallBoardFinished(bb)) return;
+
+    // Check if this is allowed big box
+    if(nextBigBox !== null && nextBigBox !== bb) return;
+
+    // Check if cell already occupied
+    if(smallBoards[bb][c] !== null) return;
+
+    makeMove(bb, c);
+  }
+
+  // Make a move (place X or O)
+  function makeMove(bb, c) {
+    if(gameOver) return;
+
+    // Mark move
+    smallBoards[bb][c] = currentPlayer;
+    updateMoveUI(bb, c, currentPlayer);
+
+    // Update small board winner state
+    updateBigBoard(bb);
+
+    // Check if game won
+    if(checkGameWinner()) return;
+
+    // Decide next big box (based on last cell)
+    if(bigBoardState[c] === null) {
+      nextBigBox = c;
+    } else {
+      nextBigBox = null; // free move if next box won/draw/full
+    }
+
+    highlightActiveBigBox();
+
+    // Switch player
+    currentPlayer = (currentPlayer === PLAYER_X) ? PLAYER_O : PLAYER_X;
+
+    if(mode === '1p' && currentPlayer === PLAYER_O && !gameOver) {
+      // AI move delayed for UX
+      setTimeout(() => aiMove(), 400);
+    }
+  }
+
+  // Exit to mode select
+  function exitToMenu() {
+    overlayEl.classList.remove('show');
+    bigBoardEl.style.display = 'none';
+    modeSelectEl.style.display = 'block';
+  }
+
+  // Start game
+  function startGame(selectedMode) {
+    mode = selectedMode;
+    currentPlayer = PLAYER_X;
+    nextBigBox = null;
+    bigBoardState.fill(null);
+    for(let i=0; i<9; i++) smallBoards[i].fill(null);
+    gameOver = false;
+
+    buildBoard();
+    highlightActiveBigBox();
+
+    modeSelectEl.style.display = 'none';
+    bigBoardEl.style.display = 'grid';
+
+    overlayEl.classList.remove('show');
+
+    // If AI starts second, no need to do anything now
+  }
+
+  // Event listeners
+  bigBoardEl.addEventListener('click', cellClicked);
+  btnRestart.addEventListener('click', () => {
+    resetGame();
+  });
+  btnExit.addEventListener('click', () => {
+    exitToMenu();
+  });
+  btn1p.addEventListener('click', () => {
+    startGame('1p');
+  });
+  btn2p.addEventListener('click', () => {
+    startGame('2p');
+  });
+
+  // Initialize
+  // Nothing to do until mode chosen
+})();
+</script>
+</body>
+</html>
